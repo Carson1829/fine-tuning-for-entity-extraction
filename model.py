@@ -6,6 +6,7 @@ from peft import LoraConfig, get_peft_model, PeftModel
 from datasets import Dataset
 import config
 from data import get_examples
+from data import load_and_group
 
 
 def get_tokenizer():

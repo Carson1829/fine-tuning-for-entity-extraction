@@ -4,6 +4,17 @@ from inference import predict_file
 from data import load_val_grouped
 import config
 
+def compute_f1(pred_tokens, gold_tokens):
+    if not pred_tokens and not gold_tokens:
+        return 1.0, 1.0, 1.0
+    if not pred_tokens or not gold_tokens:
+        return 0.0, 0.0, 0.0
+    tp = len(pred_tokens & gold_tokens)
+    precision = tp / len(pred_tokens) if pred_tokens else 0.0
+    recall    = tp / len(gold_tokens)  if gold_tokens else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    return precision, recall, f1
+    
 def get_f1_scores(predictions_path):
     """
     Compute token-level F1 from a saved predictions JSON file.

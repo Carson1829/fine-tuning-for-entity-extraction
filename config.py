@@ -20,6 +20,21 @@ WARMUP_RATIO     = 0.05
 
 VALID_TAGS = ["definition", "theorem", "proof", "example", "name", "reference"]
 
+FEW_SHOT_SYSTEM_PROMPT = (
+    "You are an expert mathematical data extraction assistant. "
+    "Extract structural spans from mathematical text. "
+    "Valid tags:\n"
+    "- definition: defines a new concept or object.\n"
+    "- theorem: makes a rigorous, provable claim.\n"
+    "- proof: proves or sketches a proof of a theorem.\n"
+    "- example: illustrates a definition or theorem.\n"
+    "- name: the name of a newly defined object or theorem.\n"
+    "- reference: a reference to a previously defined name.\n\n"
+    "Return ONLY a JSON array. Each element has keys 'tag' and 'text'. "
+    "The 'text' value must be copied VERBATIM from the input. "
+    "If no spans are found, return an empty array []."
+)
+
 SYSTEM_PROMPT = (
     "You are an expert mathematical data extraction assistant. "
     "Extract structural spans from mathematical text. "

@@ -1,7 +1,6 @@
 import json
-import random
 from collections import defaultdict
-from utils import chunk_text, build_messages
+from utils import chunk_text, build_messages_ft
 import config
 
 
@@ -44,11 +43,7 @@ def get_examples(grouped_data, tokenizer):
                         "text": chunk_text_[local_start:local_end]
                     })
 
-            if not chunk_annotations:
-                if random.random() > 0.10:
-                    continue
-
-            messages = build_messages(chunk_text_)
+            messages = build_messages_ft(chunk_text_)
             prompt_text = tokenizer.apply_chat_template(
                 messages, tokenize=False, add_generation_prompt=True
             )
