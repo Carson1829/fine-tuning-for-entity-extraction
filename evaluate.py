@@ -1,38 +1,55 @@
 import pandas as pd
 from collections import defaultdict
-from inference import predict_file
 from data import load_val_grouped
 import config
 
+
 def compute_f1(pred_tokens, gold_tokens):
+    """Compute precision, recall, and F1 from two sets of tokens.
+
+    Each token is a (char_index, tag) tuple for per-file comparison,
+    or a (fileid, char_index, tag) tuple for overall comparison.
+    Both sets must use the same format.
+
+    Returns (1.0, 1.0, 1.0) if both sets are empty (correct empty prediction).
+    Returns (0.0, 0.0, 0.0) if one set is empty and the other is not.
+    """
     if not pred_tokens and not gold_tokens:
         return 1.0, 1.0, 1.0
     if not pred_tokens or not gold_tokens:
         return 0.0, 0.0, 0.0
-    tp = len(pred_tokens & gold_tokens)
-    precision = tp / len(pred_tokens) if pred_tokens else 0.0
-    recall    = tp / len(gold_tokens)  if gold_tokens else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    tp        = len(pred_tokens & gold_tokens)
+    precision = tp / len(pred_tokens)
+    recall    = tp / len(gold_tokens)
+    f1        = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     return precision, recall, f1
-    
-def get_f1_scores(predictions_path):
-    """
-    Compute token-level F1 from a saved predictions JSON file.
-    Works for both few-shot and fine-tuned predictions.
 
-    predictions_path: path to a JSON file saved by run_few_shot(),
-                      get_val_predictions(), or get_test_predictions()
+
+def get_f1_scores(predictions_path):
+    """Compute token-level F1 scores from a saved predictions JSON file.
+
+    Expands each predicted and gold span into a set of individual character-level
+    tokens, then computes F1 on the overlap. This penalizes boundary errors
+    proportionally rather than treating a partial span match as fully wrong.
+
+    Works for both few-shot and fine-tuned predictions since it only reads
+    the saved JSON file and compares against val.json gold annotations.
+
+    Args:
+        predictions_path: path to a predictions JSON file produced by get_predictions()
+
+    Prints per-file F1, overall F1, and per-tag F1, then returns overall scores.
     """
-    df = pd.read_json(predictions_path)
+    df          = pd.read_json(predictions_path)
     val_grouped = load_val_grouped()
 
     all_pred_tokens = set()
     all_gold_tokens = set()
-    per_tag_pred = defaultdict(set)
-    per_tag_gold = defaultdict(set)
+    per_tag_pred    = defaultdict(set)
+    per_tag_gold    = defaultdict(set)
 
     for fileid, data in val_grouped.items():
-        # Build gold token set
+        # Expand each gold annotation into individual (char_idx, tag) tokens
         gold_tokens = set()
         for ann in data["annotations"]:
             for ci in range(ann["start"], ann["end"]):
@@ -40,7 +57,7 @@ def get_f1_scores(predictions_path):
                 per_tag_gold[ann["tag"]].add((fileid, ci))
         all_gold_tokens |= {(fileid, c, t) for c, t in gold_tokens}
 
-        # Build pred token set for this file
+        # Expand each predicted span into individual (char_idx, tag) tokens
         file_preds  = df[df["fileid"] == fileid].to_dict("records")
         pred_tokens = set()
         for p in file_preds:
@@ -49,10 +66,11 @@ def get_f1_scores(predictions_path):
                 per_tag_pred[p["tag"]].add((fileid, ci))
         all_pred_tokens |= {(fileid, c, t) for c, t in pred_tokens}
 
+        # Per-file F1
         p, r, f = compute_f1(pred_tokens, gold_tokens)
         print(f"{fileid[:60]}  P={p:.3f}  R={r:.3f}  F1={f:.3f}")
 
-    # Overall
+    # Overall F1 across all files
     p_all, r_all, f_all = compute_f1(all_pred_tokens, all_gold_tokens)
     print("\n" + "=" * 50)
     print("OVERALL TOKEN-LEVEL F1")
@@ -61,23 +79,24 @@ def get_f1_scores(predictions_path):
     print(f"  Recall    : {r_all:.4f}")
     print(f"  F1        : {f_all:.4f}")
 
-    # Per-tag
+    # Per-tag F1 — computed globally across all files for each tag
     print("\n" + "=" * 50)
     print("PER-TAG TOKEN-LEVEL F1")
     print("=" * 50)
     rows = []
     for tag in config.VALID_TAGS:
-        ps = {(fid, c) for fid, c in per_tag_pred[tag]}
-        gs = {(fid, c) for fid, c in per_tag_gold[tag]}
-        tp = len(ps & gs)
+        ps   = {(fid, c) for fid, c in per_tag_pred[tag]}
+        gs   = {(fid, c) for fid, c in per_tag_gold[tag]}
+        tp   = len(ps & gs)
         prec = tp / len(ps) if ps else 0.0
-        rec = tp / len(gs) if gs else 0.0
-        f1 = 2*prec*rec / (prec+rec) if (prec+rec) > 0 else 0.0
+        rec  = tp / len(gs) if gs else 0.0
+        f1   = 2*prec*rec / (prec+rec) if (prec+rec) > 0 else 0.0
         print(f"  {tag:12s}  P={prec:.3f}  R={rec:.3f}  F1={f1:.3f}  "
               f"(pred={len(ps)}, gold={len(gs)})")
         rows.append({"tag": tag, "precision": prec, "recall": rec, "f1": f1,
                      "pred_tokens": len(ps), "gold_tokens": len(gs)})
 
+    # Append overall row to the per-tag summary table
     df_f1 = pd.DataFrame(rows)
     df_f1.loc[len(df_f1)] = {
         "tag": "OVERALL", "precision": p_all, "recall": r_all, "f1": f_all,

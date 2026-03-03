@@ -9,7 +9,9 @@ from evaluate import get_f1_scores
 
 
 def main():
-
+    '''
+    Uncomment the line to run
+    '''
     # Part 1: few-shot prompting and F1 evaluation on validation set
     # get_predictions("val.txt", "few_shot_val_predictions.json", few_shot=True)
     # get_f1_scores("few_shot_val_predictions.json")

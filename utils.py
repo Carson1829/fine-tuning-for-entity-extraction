@@ -5,6 +5,9 @@ import config
 
 
 def chunk_text(text):
+    """Split a document into overlapping chunks of fixed character length.
+    Stride overlap ensures spans near chunk boundaries appear fully in at least one chunk.
+    Returns a list of (chunk_start, chunk_end, chunk_text) tuples."""
     chunks = []
     start = 0
     while start < len(text):
@@ -12,13 +15,17 @@ def chunk_text(text):
         chunks.append((start, end, text[start:end]))
         if end == len(text):
             break
-        start += config.CHUNK_SIZE - config.STRIDE
+        start += config.CHUNK_SIZE - config.STRIDE  # advance by CHUNK_SIZE - STRIDE to create overlap
     return chunks
 
 
 def extract_json(text):
-    text = re.sub(r"```(?:json)?", "", text).strip()
-    match = re.search(r"\[.*\]", text, re.DOTALL)
+    """Parse a JSON array from raw model output.
+    Strips markdown code fences the model may wrap its output in,
+    then extracts the first [...] array and parses it.
+    Returns an empty list if parsing fails."""
+    text  = re.sub(r"```(?:json)?", "", text).strip()
+    match = re.search(r"\[.*\]", text, re.DOTALL)  # re.DOTALL allows [...] to span multiple lines
     if match:
         try:
             return json.loads(match.group())
@@ -31,6 +38,9 @@ def extract_json(text):
 
 
 def find_span_in_chunk(span_text, chunk_text_):
+    """Find the character offset of a predicted span text within the chunk.
+    Uses exact string matching since the model is prompted to copy verbatim.
+    Returns (local_offset, matched_text) or (-1, span_text) if not found."""
     idx = chunk_text_.find(span_text)
     if idx != -1:
         return idx, span_text
@@ -38,6 +48,10 @@ def find_span_in_chunk(span_text, chunk_text_):
 
 
 def build_messages_fs(chunk_text_):
+    """Build the prompt messages for few-shot inference (no LoRA).
+    Includes two hardcoded examples covering definition+theorem+proof+name
+    and implicit definition+name to demonstrate the expected output format.
+    The examples use synthetic math text to avoid contamination with val/test files."""
     messages = [
         {"role": "system", "content": config.FEW_SHOT_SYSTEM_PROMPT},
         {
@@ -58,7 +72,11 @@ def build_messages_fs(chunk_text_):
     ]
     return messages
 
+
 def build_messages_ft(chunk_text_):
+    """Build the prompt messages for fine-tuned inference.
+    Uses zero-shot prompt only — few-shot examples are unnecessary
+    after training and would consume context window space."""
     messages = [
         {"role": "system", "content": config.SYSTEM_PROMPT},
         {

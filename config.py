@@ -1,3 +1,4 @@
+# Model and data parameters
 MODEL_NAME  = "Qwen/Qwen2.5-3B-Instruct"
 CHUNK_SIZE  = 1500
 STRIDE      = 300
@@ -20,6 +21,7 @@ WARMUP_RATIO     = 0.05
 
 VALID_TAGS = ["definition", "theorem", "proof", "example", "name", "reference"]
 
+# Prompt templates
 FEW_SHOT_SYSTEM_PROMPT = (
     "You are an expert mathematical data extraction assistant. "
     "Extract structural spans from mathematical text. "
